@@ -177,11 +177,12 @@ function runEnKF(Qn, Rr, Rb, steps, Ne) {
   const sqQ = chol(Q);
   const sqR = chol(Rmeas);
 
-  // Initialise ensemble around first measurement
+  // Initialise ensemble around first measurement with P0 = I (wider spread than Q)
+  const sqP0 = chol(eye(4));
   const E = [];
   for (let i = 0; i < Ne; i++) {
     const n2 = [randn(rng),randn(rng),randn(rng),randn(rng)];
-    E.push([mpx[0]+sqQ.d[0]*n2[0], mpy[0]+sqQ.d[5]*n2[1], sqQ.d[10]*n2[2], sqQ.d[15]*n2[3]]);
+    E.push([mpx[0]+get(sqP0,0,0)*n2[0], mpy[0]+get(sqP0,1,1)*n2[1], get(sqP0,2,2)*n2[2], get(sqP0,3,3)*n2[3]]);
   }
 
   const epx = [], epy = [];

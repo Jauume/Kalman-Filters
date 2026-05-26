@@ -7,8 +7,8 @@ const CHART_DEFAULTS = {
   maintainAspectRatio: false,
   plugins: { legend: { labels: { color: '#ccc', boxWidth: 14, font: { size: 11 } } } },
   scales: {
-    x: { ticks: { color: '#999', maxTicksLimit: 8 }, grid: { color: '#333' } },
-    y: { ticks: { color: '#999', maxTicksLimit: 6 }, grid: { color: '#333' } }
+    x: { type: 'linear', ticks: { color: '#999', maxTicksLimit: 8 }, grid: { color: '#333' } },
+    y: { type: 'linear', ticks: { color: '#999', maxTicksLimit: 6 }, grid: { color: '#333' } }
   }
 };
 
