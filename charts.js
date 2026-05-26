@@ -30,7 +30,7 @@ function initKF() {
       { label:'KF ±1σ',    data:pts(k,upper), borderWidth:0, pointRadius:0, backgroundColor:'rgba(90,164,255,0.15)', fill:'+1' },
       { label:'_lower',    data:pts(k,lower), borderWidth:0, pointRadius:0, backgroundColor:'rgba(90,164,255,0.15)', fill:false },
       { label:'True',      data:pts(k,tp),    borderColor:'#33c85a', borderWidth:2, pointRadius:0, fill:false },
-      { label:'Measured',  data:pts(k,meas),  borderColor:'transparent', pointBackgroundColor:'#f25050', pointRadius:3, showLine:false },
+      { label:'Measured',  data:pts(k,meas),  borderColor:'#f25050', pointBackgroundColor:'#f25050', pointRadius:3, showLine:false },
       { label:'KF estimate', data:pts(k,ep),  borderColor:'#5aa4ff', borderWidth:2, pointRadius:0, fill:false }
     ]},
     options: {...CHART_DEFAULTS, parsing:false,
@@ -108,8 +108,8 @@ function initOrbitCharts(prefix, color, label, data) {
     ]},
     options:{...CHART_DEFAULTS, parsing:false,
       scales:{
-        x:{...CHART_DEFAULTS.scales.x, title:{display:true,text:'X (m)',color:'#aaa'}},
-        y:{...CHART_DEFAULTS.scales.y, title:{display:true,text:'Y (m)',color:'#aaa'}}
+        x:{...CHART_DEFAULTS.scales.x, title:{display:true,text:'X (m)',color:'#aaa'}, min:-7, max:7},
+        y:{...CHART_DEFAULTS.scales.y, title:{display:true,text:'Y (m)',color:'#aaa'}, min:-7, max:7}
       },
       plugins:{...CHART_DEFAULTS.plugins, title:{display:true,text:`2-D Orbit — ${label}`,color:'#ddd'}}}
   });
@@ -211,7 +211,7 @@ function initAKF() {
       { label:'AKF ±1σ',    data:pts(k,upper), borderWidth:0, pointRadius:0, backgroundColor:'rgba(255,153,51,0.15)', fill:'+1' },
       { label:'_lower',     data:pts(k,lower), borderWidth:0, pointRadius:0, backgroundColor:'rgba(255,153,51,0.15)', fill:false },
       { label:'True',       data:pts(k,tp),    borderColor:'#33c85a', borderWidth:2, pointRadius:0, fill:false },
-      { label:'Measured',   data:pts(k,meas),  borderColor:'transparent', pointBackgroundColor:'#f25050', pointRadius:2.5, showLine:false },
+      { label:'Measured',   data:pts(k,meas),  borderColor:'#f25050', pointBackgroundColor:'#f25050', pointRadius:2.5, showLine:false },
       { label:'AKF estimate', data:pts(k,ep),  borderColor:col, borderWidth:2, pointRadius:0, fill:false }
     ]},
     options:{...CHART_DEFAULTS, parsing:false,
