@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kalman Filter Demo</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #1a1a2e; color: #e0e0e0; min-height: 100vh; }
+  h1 { text-align: center; padding: 16px 0 8px; font-size: 1.4rem; color: #7eb8f7; letter-spacing: 1px; }
+
+  /* Tabs */
+  .tabs { display: flex; justify-content: center; gap: 4px; padding: 0 12px 0; flex-wrap: wrap; }
+  .tab-btn {
+    padding: 8px 20px; border: none; cursor: pointer; border-radius: 6px 6px 0 0;
+    font-size: 0.9rem; font-weight: 600; transition: background 0.2s;
+    background: #2a2a4a; color: #aaa;
+  }
+  .tab-btn.active { color: #fff; }
+  .tab-btn[data-tab="kf"].active    { background: #3a5fa0; }
+  .tab-btn[data-tab="ekf"].active   { background: #3a5fa0; }
+  .tab-btn[data-tab="ukf"].active   { background: #6a3a9a; }
+  .tab-btn[data-tab="enkf"].active  { background: #1a7a6a; }
+  .tab-btn[data-tab="akf"].active   { background: #9a5010; }
+
+  .tab-content { display: none; padding: 0 12px 12px; }
+  .tab-content.active { display: block; }
+
+  /* Parameter panel */
+  .params {
+    background: #22223a; border-radius: 8px; padding: 12px 16px;
+    margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center;
+  }
+  .param-group { display: flex; flex-direction: column; gap: 4px; min-width: 160px; flex: 1; }
+  .param-group label { font-size: 0.78rem; font-weight: 600; color: #aaa; }
+  .param-group input[type=range] { width: 100%; accent-color: #7eb8f7; cursor: pointer; }
+  .param-group .val { font-size: 0.82rem; font-weight: 700; }
+
+  /* Charts grid */
+  .charts-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .charts-3row { display: grid; grid-template-rows: 1fr 1fr; gap: 10px; }
+  .chart-top    { grid-column: 1 / -1; }
+  .chart-box { background: #1e1e32; border-radius: 8px; padding: 8px; position: relative; height: 260px; }
+  .chart-box.tall { height: 340px; }
+
+  /* Color accents per tab */
+  .kf-val    { color: #5aa4ff; }
+  .ekf-val   { color: #5aa4ff; }
+  .ukf-val   { color: #c066ff; }
+  .enkf-val  { color: #33d6b0; }
+  .akf-val   { color: #ff9933; }
+</style>
+</head>
+<body>
+<h1>🔬 Kalman Filter Demo</h1>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="kf">KF</button>
+  <button class="tab-btn" data-tab="ekf">EKF</button>
+  <button class="tab-btn" data-tab="ukf">UKF</button>
+  <button class="tab-btn" data-tab="enkf">EnKF</button>
+  <button class="tab-btn" data-tab="akf">AKF</button>
+</div>
+
+<!-- ===== KF ===== -->
+<div class="tab-content active" id="tab-kf">
+  <div class="params">
+    <div class="param-group">
+      <label>Process noise Q</label>
+      <input type="range" id="kf-Q" min="0.01" max="5" step="0.01" value="0.1">
+      <span class="val kf-val" id="kf-Q-val">Q = 0.100</span>
+    </div>
+    <div class="param-group">
+      <label>Sensor noise R</label>
+      <input type="range" id="kf-R" min="0.1" max="10" step="0.1" value="2">
+      <span class="val kf-val" id="kf-R-val">R = 2.000</span>
+    </div>
+    <div class="param-group">
+      <label>Steps N</label>
+      <input type="range" id="kf-N" min="20" max="200" step="1" value="80">
+      <span class="val kf-val" id="kf-N-val">N = 80</span>
+    </div>
+  </div>
+  <div style="display:grid; grid-template-rows: 340px; grid-template-columns: 1fr; gap:10px; margin-bottom:10px;">
+    <div class="chart-box tall"><canvas id="kf-c1"></canvas></div>
+  </div>
+  <div class="charts-2col">
+    <div class="chart-box"><canvas id="kf-c2"></canvas></div>
+    <div class="chart-box"><canvas id="kf-c3"></canvas></div>
+  </div>
+</div>
+
+<!-- ===== EKF ===== -->
+<div class="tab-content" id="tab-ekf">
+  <div class="params">
+    <div class="param-group">
+      <label>Process noise Q</label>
+      <input type="range" id="ekf-Q" min="0.001" max="0.5" step="0.001" value="0.05">
+      <span class="val ekf-val" id="ekf-Q-val">Q = 0.0500</span>
+    </div>
+    <div class="param-group">
+      <label>Range noise σr</label>
+      <input type="range" id="ekf-R" min="0.05" max="2" step="0.01" value="0.3">
+      <span class="val ekf-val" id="ekf-R-val">σr = 0.300</span>
+    </div>
+    <div class="param-group">
+      <label>Bearing noise σθ</label>
+      <input type="range" id="ekf-B" min="0.01" max="0.3" step="0.001" value="0.05">
+      <span class="val ekf-val" id="ekf-B-val">σθ = 0.050</span>
+    </div>
+    <div class="param-group">
+      <label>Steps N</label>
+      <input type="range" id="ekf-N" min="30" max="200" step="1" value="100">
+      <span class="val ekf-val" id="ekf-N-val">N = 100</span>
+    </div>
+  </div>
+  <div class="charts-2col">
+    <div class="chart-box tall"><canvas id="ekf-c1"></canvas></div>
+    <div class="chart-box tall"><canvas id="ekf-c2"></canvas></div>
+  </div>
+</div>
+
+<!-- ===== UKF ===== -->
+<div class="tab-content" id="tab-ukf">
+  <div class="params">
+    <div class="param-group">
+      <label>Process noise Q</label>
+      <input type="range" id="ukf-Q" min="0.001" max="0.5" step="0.001" value="0.05">
+      <span class="val ukf-val" id="ukf-Q-val">Q = 0.0500</span>
+    </div>
+    <div class="param-group">
+      <label>Range noise σr</label>
+      <input type="range" id="ukf-R" min="0.05" max="2" step="0.01" value="0.3">
+      <span class="val ukf-val" id="ukf-R-val">σr = 0.300</span>
+    </div>
+    <div class="param-group">
+      <label>Bearing noise σθ</label>
+      <input type="range" id="ukf-B" min="0.01" max="0.3" step="0.001" value="0.05">
+      <span class="val ukf-val" id="ukf-B-val">σθ = 0.050</span>
+    </div>
+    <div class="param-group">
+      <label>Steps N</label>
+      <input type="range" id="ukf-N" min="30" max="200" step="1" value="100">
+      <span class="val ukf-val" id="ukf-N-val">N = 100</span>
+    </div>
+  </div>
+  <div class="charts-2col">
+    <div class="chart-box tall"><canvas id="ukf-c1"></canvas></div>
+    <div class="chart-box tall"><canvas id="ukf-c2"></canvas></div>
+  </div>
+</div>
+
+<!-- ===== EnKF ===== -->
+<div class="tab-content" id="tab-enkf">
+  <div class="params">
+    <div class="param-group">
+      <label>Process noise Q</label>
+      <input type="range" id="enkf-Q" min="0.001" max="0.5" step="0.001" value="0.05">
+      <span class="val enkf-val" id="enkf-Q-val">Q = 0.0500</span>
+    </div>
+    <div class="param-group">
+      <label>Range noise σr</label>
+      <input type="range" id="enkf-R" min="0.05" max="2" step="0.01" value="0.3">
+      <span class="val enkf-val" id="enkf-R-val">σr = 0.300</span>
+    </div>
+    <div class="param-group">
+      <label>Bearing noise σθ</label>
+      <input type="range" id="enkf-B" min="0.01" max="0.3" step="0.001" value="0.05">
+      <span class="val enkf-val" id="enkf-B-val">σθ = 0.050</span>
+    </div>
+    <div class="param-group">
+      <label>Ensemble size Ne</label>
+      <input type="range" id="enkf-Ne" min="10" max="200" step="1" value="50">
+      <span class="val enkf-val" id="enkf-Ne-val">Ne = 50</span>
+    </div>
+    <div class="param-group">
+      <label>Steps N</label>
+      <input type="range" id="enkf-N" min="30" max="200" step="1" value="100">
+      <span class="val enkf-val" id="enkf-N-val">N = 100</span>
+    </div>
+  </div>
+  <div class="charts-2col">
+    <div class="chart-box tall"><canvas id="enkf-c1"></canvas></div>
+    <div class="chart-box tall"><canvas id="enkf-c2"></canvas></div>
+  </div>
+</div>
+
+<!-- ===== AKF ===== -->
+<div class="tab-content" id="tab-akf">
+  <div class="params">
+    <div class="param-group">
+      <label>Process noise Q</label>
+      <input type="range" id="akf-Q" min="0.01" max="5" step="0.01" value="0.1">
+      <span class="val akf-val" id="akf-Q-val">Q = 0.100</span>
+    </div>
+    <div class="param-group">
+      <label>Initial R₀</label>
+      <input type="range" id="akf-R" min="0.1" max="10" step="0.1" value="1">
+      <span class="val akf-val" id="akf-R-val">R₀ = 1.000</span>
+    </div>
+    <div class="param-group">
+      <label>Window W</label>
+      <input type="range" id="akf-W" min="3" max="40" step="1" value="10">
+      <span class="val akf-val" id="akf-W-val">W = 10</span>
+    </div>
+    <div class="param-group">
+      <label>Steps N</label>
+      <input type="range" id="akf-N" min="40" max="200" step="1" value="100">
+      <span class="val akf-val" id="akf-N-val">N = 100</span>
+    </div>
+  </div>
+  <div style="margin-bottom:10px;">
+    <div class="chart-box tall"><canvas id="akf-c1"></canvas></div>
+  </div>
+  <div class="charts-2col">
+    <div class="chart-box"><canvas id="akf-c2"></canvas></div>
+    <div class="chart-box"><canvas id="akf-c3"></canvas></div>
+  </div>
+</div>
+
+<script>
+// ─── Seeded RNG (Mulberry32) ─────────────────────────────────────────────────
+function makeRng(seed) {
+  let s = seed >>> 0;
+  return () => {
+    s |= 0; s = s + 0x6D2B79F5 | 0;
+    let t = Math.imul(s ^ s >>> 15, 1 | s);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+// Box-Muller standard normal
+function randn(rng) {
+  const u = 1 - rng(), v = rng();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+// ─── Matrix helpers (flat row-major, [rows, cols]) ───────────────────────────
+function mat(r, c, data) { return { r, c, d: data ? data.slice() : new Array(r*c).fill(0) }; }
+function get(m, i, j) { return m.d[i*m.c + j]; }
+function set(m, i, j, v) { m.d[i*m.c + j] = v; }
+function mget(m, i, j) { return m.d[i*m.c + j]; }
+
+function mmul(A, B) {
+  const C = mat(A.r, B.c);
+  for (let i = 0; i < A.r; i++)
+    for (let j = 0; j < B.c; j++) {
+      let s = 0;
+      for (let k = 0; k < A.c; k++) s += get(A,i,k)*get(B,k,j);
+      set(C,i,j,s);
+    }
+  return C;
+}
+function madd(A, B) {
+  const C = mat(A.r, A.c);
+  for (let i = 0; i < A.d.length; i++) C.d[i] = A.d[i] + B.d[i];
+  return C;
+}
+function msub(A, B) {
+  const C = mat(A.r, A.c);
+  for (let i = 0; i < A.d.length; i++) C.d[i] = A.d[i] - B.d[i];
+  return C;
+}
+function mscale(A, s) {
+  const C = mat(A.r, A.c);
+  for (let i = 0; i < A.d.length; i++) C.d[i] = A.d[i] * s;
+  return C;
+}
+function trans(A) {
+  const C = mat(A.c, A.r);
+  for (let i = 0; i < A.r; i++)
+    for (let j = 0; j < A.c; j++) set(C,j,i,get(A,i,j));
+  return C;
+}
+function eye(n) {
+  const I = mat(n,n);
+  for (let i = 0; i < n; i++) set(I,i,i,1);
+  return I;
+}
+function diag2(a, b) {
+  const D = mat(2,2);
+  set(D,0,0,a); set(D,1,1,b);
+  return D;
+}
+// 2×2 inverse
+function inv2(A) {
+  const det = get(A,0,0)*get(A,1,1) - get(A,0,1)*get(A,1,0);
+  const B = mat(2,2);
+  set(B,0,0, get(A,1,1)/det); set(B,0,1,-get(A,0,1)/det);
+  set(B,1,0,-get(A,1,0)/det); set(B,1,1, get(A,0,0)/det);
+  return B;
+}
+// 4×4 inverse via LU (Gauss-Jordan)
+function invN(A) {
+  const n = A.r;
+  const aug = mat(n, 2*n);
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < n; j++) set(aug, i, j, get(A,i,j));
+  for (let i = 0; i < n; i++) set(aug, i, n+i, 1);
+  for (let col = 0; col < n; col++) {
+    let pivot = col;
+    for (let row = col+1; row < n; row++)
+      if (Math.abs(get(aug,row,col)) > Math.abs(get(aug,pivot,col))) pivot = row;
+    const tmp = aug.d.slice(col*2*n, (col+1)*2*n);
+    aug.d.splice(col*2*n, 2*n, ...aug.d.slice(pivot*2*n, (pivot+1)*2*n));
+    aug.d.splice(pivot*2*n, 2*n, ...tmp);
+    const pv = get(aug, col, col);
+    for (let j = 0; j < 2*n; j++) set(aug, col, j, get(aug,col,j)/pv);
+    for (let row = 0; row < n; row++) {
+      if (row === col) continue;
+      const f = get(aug, row, col);
+      for (let j = 0; j < 2*n; j++) set(aug, row, j, get(aug,row,j) - f*get(aug,col,j));
+    }
+  }
+  const inv = mat(n,n);
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < n; j++) set(inv, i, j, get(aug, i, n+j));
+  return inv;
+}
+// Cholesky lower (n×n)
+function chol(A) {
+  const n = A.r;
+  const L = mat(n, n);
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j <= i; j++) {
+      let s = get(A,i,j);
+      for (let k = 0; k < j; k++) s -= get(L,i,k)*get(L,j,k);
+      if (i === j) set(L,i,j, Math.sqrt(Math.max(s, 1e-12)));
+      else         set(L,i,j, s / get(L,j,j));
+    }
+  }
+  return L;
+}
+// col vector helpers
+function col(arr) { const v = mat(arr.length,1); v.d = arr.slice(); return v; }
+function row2arr(m) { return m.d.slice(); }
+
+// ─── Wrap angle to [-π, π] ───────────────────────────────────────────────────
+function wrapAngle(a) { return ((a + Math.PI) % (2*Math.PI) + 2*Math.PI) % (2*Math.PI) - Math.PI; }
+
+// ─── KF ─────────────────────────────────────────────────────────────────────
+function runKF(Qn, Rn, steps) {
+  const rng = makeRng(42);
+  const dt = 1;
+  // F = [1 dt; 0 1], H = [1 0]
+  const F = mat(2,2,[1,dt,0,1]);
+  const H = mat(1,2,[1,0]);
+  const Q = mscale(eye(2), Qn);
+  const R_scalar = Rn;
+
+  const tp = [], meas = [];
+  let pos = 0, vel = 1;
+  for (let k = 0; k < steps; k++) {
+    pos += vel*dt + randn(rng)*Math.sqrt(Qn);
+    tp.push(pos);
+    meas.push(pos + randn(rng)*Math.sqrt(Rn));
+  }
+
+  let x = col([meas[0], 0]);
+  let P = eye(2);
+  const ep = [], ev = [], sig_p = [];
+
+  for (let k = 0; k < steps; k++) {
+    // Predict
+    x = mmul(F, x);
+    P = madd(mmul(mmul(F, P), trans(F)), Q);
+    // Update
+    const HxV = mmul(H, x); // 1×1
+    const S_val = get(mmul(mmul(H, P), trans(H)), 0, 0) + R_scalar;
+    const K = mscale(mmul(P, trans(H)), 1/S_val); // 2×1
+    const innov = meas[k] - HxV.d[0];
+    x = madd(x, mscale(K, innov));
+    P = mmul(msub(eye(2), mmul(K, H)), P);
+    ep.push(x.d[0]); ev.push(x.d[1]);
+    sig_p.push(Math.sqrt(get(P,0,0)));
+  }
+  return { tp, meas, ep, ev, sig_p };
+}
+
+// ─── EKF ─────────────────────────────────────────────────────────────────────
+function runOrbit(steps, rng, Rr, Rb) {
+  const dt = 0.1, omega = 0.15, radius = 5;
+  const tpx = [], tpy = [], rm = [], bm = [], mpx = [], mpy = [];
+  for (let k = 0; k < steps; k++) {
+    const t = k * dt * (omega / dt); // = omega * k
+    tpx.push(radius * Math.cos(omega * k));
+    tpy.push(radius * Math.sin(omega * k));
+    const r0 = Math.sqrt(tpx[k]**2 + tpy[k]**2);
+    const ri = r0 + randn(rng)*Rr;
+    const bi = Math.atan2(tpy[k], tpx[k]) + randn(rng)*Rb;
+    rm.push(ri); bm.push(bi);
+    mpx.push(ri*Math.cos(bi)); mpy.push(ri*Math.sin(bi));
+  }
+  return { tpx, tpy, rm, bm, mpx, mpy };
+}
+
+function runEKF(Qn, Rr, Rb, steps) {
+  const rng = makeRng(7);
+  const { tpx, tpy, rm, bm, mpx, mpy } = runOrbit(steps, rng, Rr, Rb);
+  const dt = 0.1;
+  const F = mat(4,4,[1,0,dt,0, 0,1,0,dt, 0,0,1,0, 0,0,0,1]);
+  const Q = mscale(eye(4), Qn);
+  const Rmeas = diag2(Rr*Rr, Rb*Rb);
+
+  let x = col([mpx[0], mpy[0], 0, 0]);
+  let P = eye(4);
+  const epx = [], epy = [];
+
+  for (let k = 0; k < steps; k++) {
+    x = mmul(F, x); P = madd(mmul(mmul(F,P),trans(F)), Q);
+    const px = x.d[0], py = x.d[1];
+    const r = Math.max(Math.sqrt(px*px+py*py), 1e-6);
+    const hx = mat(2,1,[r, Math.atan2(py,px)]);
+    const Hj = mat(2,4,[px/r, py/r, 0, 0,  -py/(r*r), px/(r*r), 0, 0]);
+    const y = mat(2,1,[rm[k]-hx.d[0], wrapAngle(bm[k]-hx.d[1])]);
+    const S = madd(mmul(mmul(Hj,P),trans(Hj)), Rmeas);
+    const Sinv = inv2(S);
+    const K = mmul(mmul(P, trans(Hj)), Sinv);
+    x = madd(x, mmul(K, y));
+    P = mmul(msub(eye(4), mmul(K, Hj)), P);
+    epx.push(x.d[0]); epy.push(x.d[1]);
+  }
+  return { tpx, tpy, mpx, mpy, epx, epy };
+}
+
+// ─── UKF ─────────────────────────────────────────────────────────────────────
+function runUKF(Qn, Rr, Rb, steps) {
+  const rng = makeRng(7);
+  const { tpx, tpy, rm, bm, mpx, mpy } = runOrbit(steps, rng, Rr, Rb);
+  const dt = 0.1;
+  const F = mat(4,4,[1,0,dt,0, 0,1,0,dt, 0,0,1,0, 0,0,0,1]);
+  const Q = mscale(eye(4), Qn);
+  const Rmeas = diag2(Rr*Rr, Rb*Rb);
+
+  const n = 4, alpha = 1e-3, beta = 2, kappa = 0;
+  const lam = alpha*alpha*(n+kappa) - n;
+  const Wm = new Array(2*n+1).fill(1/(2*(n+lam)));
+  Wm[0] = lam/(n+lam);
+  const Wc = Wm.slice();
+  Wc[0] += (1 - alpha*alpha + beta);
+
+  let x = col([mpx[0], mpy[0], 0, 0]);
+  let P = eye(4);
+  const upx = [], upy = [];
+
+  for (let k = 0; k < steps; k++) {
+    // ─ Predict ─
+    const sqP1 = chol(mscale(P, n+lam));
+    // sigma columns: x, x+cols(sqP1), x-cols(sqP1)  → 2n+1 columns
+    const sigma = [];
+    sigma.push(x.d.slice());
+    for (let j = 0; j < n; j++) {
+      const c = []; for (let i = 0; i < n; i++) c.push(get(sqP1,i,j));
+      sigma.push(x.d.map((v,i) => v+c[i]));
+      sigma.push(x.d.map((v,i) => v-c[i]));
+    }
+    // Propagate through F
+    const sf = sigma.map(s => { const v = col(s); return row2arr(mmul(F,v)); });
+    // Predicted mean
+    const xp = new Array(n).fill(0);
+    for (let i = 0; i < 2*n+1; i++) for (let d = 0; d < n; d++) xp[d] += Wm[i]*sf[i][d];
+    // Predicted covariance
+    let Pp = mat(n,n, Q.d.slice());
+    for (let i = 0; i < 2*n+1; i++) {
+      const d = sf[i].map((v,idx) => v - xp[idx]);
+      for (let r = 0; r < n; r++)
+        for (let c2 = 0; c2 < n; c2++)
+          Pp.d[r*n+c2] += Wc[i]*d[r]*d[c2];
+    }
+
+    // ─ Update ─
+    const sqP2 = chol(mscale(Pp, n+lam));
+    const sigma2 = [];
+    const xpv = xp;
+    sigma2.push(xpv.slice());
+    for (let j = 0; j < n; j++) {
+      const c = []; for (let i = 0; i < n; i++) c.push(get(sqP2,i,j));
+      sigma2.push(xpv.map((v,i) => v+c[i]));
+      sigma2.push(xpv.map((v,i) => v-c[i]));
+    }
+    // h for each sigma point
+    const zs = sigma2.map(s => {
+      const px2 = s[0], py2 = s[1];
+      return [Math.max(Math.sqrt(px2*px2+py2*py2), 1e-6), Math.atan2(py2,px2)];
+    });
+    const zp = [0, 0];
+    for (let i = 0; i < 2*n+1; i++) { zp[0] += Wm[i]*zs[i][0]; zp[1] += Wm[i]*zs[i][1]; }
+
+    let Pzz = mat(2,2, Rmeas.d.slice());
+    let Pxz = mat(n,2);
+    for (let i = 0; i < 2*n+1; i++) {
+      const dZ = [zs[i][0]-zp[0], zs[i][1]-zp[1]];
+      const dX = sigma2[i].map((v,idx) => v - xpv[idx]);
+      for (let r = 0; r < 2; r++) for (let c2 = 0; c2 < 2; c2++)
+        Pzz.d[r*2+c2] += Wc[i]*dZ[r]*dZ[c2];
+      for (let r = 0; r < n; r++) for (let c2 = 0; c2 < 2; c2++)
+        Pxz.d[r*2+c2] += Wc[i]*dX[r]*dZ[c2];
+    }
+    const Pzzinv = inv2(Pzz);
+    const Kv = mmul(Pxz, Pzzinv); // n×2
+    const inn = [rm[k]-zp[0], wrapAngle(bm[k]-zp[1])];
+    const xnew = xp.map((v,i) => v + Kv.d[i*2]*inn[0] + Kv.d[i*2+1]*inn[1]);
+    // P = Pp - K*Pzz*K'
+    const KPzz = mmul(Kv, Pzz);
+    const KPzzKt = mmul(KPzz, trans(Kv));
+    P = msub(Pp, KPzzKt);
+    x = col(xnew);
+    upx.push(x.d[0]); upy.push(x.d[1]);
+  }
+  return { tpx, tpy, mpx, mpy, upx, upy };
+}
+
+// ─── EnKF ────────────────────────────────────────────────────────────────────
+function runEnKF(Qn, Rr, Rb, steps, Ne) {
+  const rng = makeRng(7);
+  const { tpx, tpy, rm, bm, mpx, mpy } = runOrbit(steps, rng, Rr, Rb);
+  const dt = 0.1;
+  const F = mat(4,4,[1,0,dt,0, 0,1,0,dt, 0,0,1,0, 0,0,0,1]);
+  const Q = mscale(eye(4), Qn);
+  const Rmeas = diag2(Rr*Rr, Rb*Rb);
+  const sqQ = chol(Q);
+  const sqR = chol(Rmeas);
+
+  // Init ensemble: Ne columns of state
+  const E = [];
+  for (let i = 0; i < Ne; i++) {
+    const noise = [randn(rng),randn(rng),randn(rng),randn(rng)];
+    E.push([
+      mpx[0] + sqQ.d[0]*noise[0],
+      mpy[0] + sqQ.d[5]*noise[1],
+      sqQ.d[10]*noise[2],
+      sqQ.d[15]*noise[3]
+    ]);
+  }
+
+  const epx = [], epy = [];
+
+  for (let k = 0; k < steps; k++) {
+    // Predict
+    for (let i = 0; i < Ne; i++) {
+      const v = col(E[i]);
+      const Fv = row2arr(mmul(F, v));
+      const noise = [randn(rng),randn(rng),randn(rng),randn(rng)];
+      // Add process noise (simplified: diagonal sqQ)
+      E[i] = Fv.map((val,d) => {
+        let n2 = 0;
+        for (let j = 0; j < 4; j++) n2 += get(sqQ,d,j)*noise[j];
+        return val + n2;
+      });
+    }
+
+    // Ensemble mean
+    const xm = new Array(4).fill(0);
+    for (let i = 0; i < Ne; i++) for (let d = 0; d < 4; d++) xm[d] += E[i][d];
+    for (let d = 0; d < 4; d++) xm[d] /= Ne;
+
+    // Anomaly matrix A (4×Ne)
+    const A = mat(4, Ne);
+    for (let i = 0; i < Ne; i++)
+      for (let d = 0; d < 4; d++) set(A, d, i, (E[i][d]-xm[d])/Math.sqrt(Ne-1));
+
+    // Perturbed observations (2×Ne)
+    const zObs = [];
+    for (let i = 0; i < Ne; i++) {
+      const n2 = [randn(rng), randn(rng)];
+      zObs.push([
+        rm[k] + get(sqR,0,0)*n2[0],
+        bm[k] + get(sqR,1,1)*n2[1]
+      ]);
+    }
+
+    // H(x) for each member
+    const Hx = E.map(s => {
+      const px = s[0], py = s[1];
+      return [Math.max(Math.sqrt(px*px+py*py), 1e-6), Math.atan2(py,px)];
+    });
+    const zm = [0, 0];
+    for (let i = 0; i < Ne; i++) { zm[0] += Hx[i][0]; zm[1] += Hx[i][1]; }
+    zm[0] /= Ne; zm[1] /= Ne;
+
+    // AH (2×Ne)
+    const AH = mat(2, Ne);
+    for (let i = 0; i < Ne; i++) {
+      set(AH,0,i,(Hx[i][0]-zm[0])/Math.sqrt(Ne-1));
+      set(AH,1,i,(Hx[i][1]-zm[1])/Math.sqrt(Ne-1));
+    }
+
+    // Pzz = AH*AH' + R (2×2)
+    const Pzz = madd(mmul(AH, trans(AH)), Rmeas);
+    // Pxz = A*AH' (4×2)
+    const Pxz = mmul(A, trans(AH));
+    const Kv = mmul(Pxz, inv2(Pzz)); // 4×2
+
+    for (let i = 0; i < Ne; i++) {
+      const inn = [zObs[i][0]-Hx[i][0], wrapAngle(zObs[i][1]-Hx[i][1])];
+      for (let d = 0; d < 4; d++)
+        E[i][d] += get(Kv,d,0)*inn[0] + get(Kv,d,1)*inn[1];
+    }
+
+    const xm2 = new Array(4).fill(0);
+    for (let i = 0; i < Ne; i++) for (let d = 0; d < 4; d++) xm2[d] += E[i][d];
+    epx.push(xm2[0]/Ne); epy.push(xm2[1]/Ne);
+  }
+  return { tpx, tpy, mpx, mpy, epx, epy };
+}
+
+// ─── AKF ─────────────────────────────────────────────────────────────────────
+function runAKF(Qn, R0, steps, W) {
+  const rng = makeRng(42);
+  const dt = 1;
+  const F = mat(2,2,[1,dt,0,1]);
+  const H = mat(1,2,[1,0]);
+  const Q = mscale(eye(2), Qn);
+
+  const tp = [], meas = [];
+  let pos = 0, vel = 1;
+  for (let k = 0; k < steps; k++) {
+    pos += vel*dt + randn(rng)*Math.sqrt(Qn);
+    tp.push(pos);
+    const Rtrue = R0 * (1 + 3*(k >= steps/2 ? 1 : 0));
+    meas.push(pos + randn(rng)*Math.sqrt(Rtrue));
+  }
+
+  let x = col([meas[0], 0]);
+  let P = eye(2);
+  let R = R0;
+  const ep = [], ev = [], sig_p = [], Rhist = [];
+  const innov = new Array(W).fill(0);
+
+  for (let k = 0; k < steps; k++) {
+    x = mmul(F, x); P = madd(mmul(mmul(F,P),trans(F)), Q);
+    const S_val = get(mmul(mmul(H,P),trans(H)),0,0) + R;
+    const K = mscale(mmul(P, trans(H)), 1/S_val);
+    const nu = meas[k] - mmul(H,x).d[0];
+    x = madd(x, mscale(K, nu));
+    P = mmul(msub(eye(2), mmul(K,H)), P);
+    ep.push(x.d[0]); ev.push(x.d[1]);
+    sig_p.push(Math.sqrt(get(P,0,0)));
+    innov[k % W] = nu;
+    if (k >= W-1) {
+      const innov2mean = innov.reduce((a,v) => a+v*v, 0) / W;
+      const HPH = get(mmul(mmul(H,P),trans(H)),0,0);
+      R = Math.max(innov2mean - HPH, 1e-4);
+    }
+    Rhist.push(R);
+  }
+  return { tp, meas, ep, ev, sig_p, Rhist };
+}
+
+// ─── Chart helpers ────────────────────────────────────────────────────────────
+const CHART_DEFAULTS = {
+  animation: false,
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { labels: { color: '#ccc', boxWidth: 14, font: { size: 11 } } } },
+  scales: {
+    x: { ticks: { color: '#999', maxTicksLimit: 8 }, grid: { color: '#333' } },
+    y: { ticks: { color: '#999', maxTicksLimit: 6 }, grid: { color: '#333' } }
+  }
+};
+
+function mkChart(id, cfg) {
+  const ctx = document.getElementById(id).getContext('2d');
+  return new Chart(ctx, { ...cfg, options: { ...CHART_DEFAULTS, ...(cfg.options||{}) } });
+}
+
+function range(n) { return Array.from({length: n}, (_,i) => i+1); }
+
+// Band dataset (fill between ep+sig and ep-sig using Chart.js fill)
+function bandData(k, upper, lower, color) {
+  return [
+    { label: 'KF ±1σ upper', data: upper.map((v,i)=>({x:k[i],y:v})), borderWidth:0, pointRadius:0,
+      backgroundColor: color+'26', fill: '+1', tension:0.3 },
+    { label: '_lower', data: lower.map((v,i)=>({x:k[i],y:v})), borderWidth:0, pointRadius:0,
+      backgroundColor: color+'26', fill: false, tension:0.3 }
+  ];
+}
+
+// ─── Chart instances ──────────────────────────────────────────────────────────
+const charts = {};
+
+function initKF() {
+  const { tp, meas, ep, ev, sig_p } = runKF(0.1, 2, 80);
+  const k = range(tp.length);
+  const upper = ep.map((v,i)=>v+sig_p[i]), lower = ep.map((v,i)=>v-sig_p[i]);
+
+  charts.kf1 = new Chart(document.getElementById('kf-c1').getContext('2d'), {
+    type: 'line',
+    data: { datasets: [
+      { label: 'KF ±1σ', data: upper.map((v,i)=>({x:k[i],y:v})), borderWidth:0, pointRadius:0,
+        backgroundColor:'rgba(90,164,255,0.15)', fill:'+1' },
+      { label: '_lower', data: lower.map((v,i)=>({x:k[i],y:v})), borderWidth:0, pointRadius:0,
+        backgroundColor:'rgba(90,164,255,0.15)', fill: false },
+      { label: 'True', data: tp.map((v,i)=>({x:k[i],y:v})), borderColor:'#33c85a', borderWidth:2, pointRadius:0, fill:false },
+      { label: 'Measured', data: meas.map((v,i)=>({x:k[i],y:v})), borderColor:'transparent', pointBackgroundColor:'#f25050', pointRadius:3, showLine:false },
+      { label: 'KF estimate', data: ep.map((v,i)=>({x:k[i],y:v})), borderColor:'#5aa4ff', borderWidth:2, pointRadius:0, fill:false }
+    ]},
+    options: { ...CHART_DEFAULTS, parsing:false, plugins:{...CHART_DEFAULTS.plugins, title:{display:true,text:'Position tracking',color:'#ddd'}}}
+  });
+  charts.kf2 = new Chart(document.getElementById('kf-c2').getContext('2d'), {
+    type:'line',
+    data:{ datasets:[
+      { label:'True vel=1', data: tp.map((_,i)=>({x:k[i],y:1})), borderColor:'#33c85a', borderWidth:1.5, borderDash:[5,3], pointRadius:0, fill:false },
+      { label:'KF velocity', data: ev.map((v,i)=>({x:k[i],y:v})), borderColor:'#f5cc20', borderWidth:2, pointRadius:0, fill:false }
+    ]},
+    options:{...CHART_DEFAULTS,parsing:false,plugins:{...CHART_DEFAULTS.plugins,title:{display:true,text:'Velocity estimate',color:'#ddd'}}}
+  });
+  const err_kf = ep.map((v,i)=>Math.abs(v-tp[i]));
+  const err_m  = meas.map((v,i)=>Math.abs(v-tp[i]));
+  const rmse = Math.sqrt(err_kf.reduce((a,v)=>a+v*v,0)/err_kf.length);
+  charts.kf3 = new Chart(document.getElementById('kf-c3').getContext('2d'), {
+    type:'line',
+    data:{ datasets:[
+      { label:'|meas-true|', data:err_m.map((v,i)=>({x:k[i],y:v})), borderColor:'#f25050', borderWidth:1.2, pointRadius:0, fill:false },
+      { label:'|KF-true|', data:err_kf.map((v,i)=>({x:k[i],y:v})), borderColor:'#5aa4ff', borderWidth:2, pointRadius:0, fill:false },
+      { label:'√P₁₁ (1σ)', data:sig_p.map((v,i)=>({x:k[i],y:v})), borderColor:'#f5b820', borderWidth:2, borderDash:[5,3], pointRadius:0, fill:false },
+      { label:`RMSE=${rmse.toFixed(2)}`, data:k.map(v=>({x:v,y:rmse})), borderColor:'#5aa4ff', borderWidth:1.4, borderDash:[3,3], pointRadius:0, fill:false }
+    ]},
+    options:{...CHART_DEFAULTS,parsing:false,plugins:{...CHART_DEFAULTS.plugins,title:{display:true,text:'Error vs filter belief',color:'#ddd'}}}
+  });
+}
+
+function updateKF() {
+  const Q = +document.getElementById('kf-Q').value;
+  const R = +document.getElementById('kf-R').value;
+  const N = +document.getElementById('kf-N').value;
+  document.getElementById('kf-Q-val').textContent = `Q = ${Q.toFixed(3)}`;
+  document.getElementById('kf-R-val').textContent = `R = ${R.toFixed(3)}`;
+  document.getElementById('kf-N-val').textContent = `N = ${N}`;
+  const { tp, meas, ep, ev, sig_p } = runKF(Q, R, N);
+  const k = range(N);
+  const upper = ep.map((v,i)=>v+sig_p[i]), lower = ep.map((v,i)=>v-sig_p[i]);
+  const err_kf = ep.map((v,i)=>Math.abs(v-tp[i]));
+  const err_m  = meas.map((v,i)=>Math.abs(v-tp[i]));
+  const rmse = Math.sqrt(err_kf.reduce((a,v)=>a+v*v,0)/err_kf.length);
+
+  const c1 = charts.kf1; c1.data.datasets[0].data = upper.map((v,i)=>({x:k[i],y:v}));
+  c1.data.datasets[1].data = lower.map((v,i)=>({x:k[i],y:v}));
+  c1.data.datasets[2].data = tp.map((v,i)=>({x:k[i],y:v}));
+  c1.data.datasets[3].data = meas.map((v,i)=>({x:k[i],y:v}));
+  c1.data.datasets[4].data = ep.map((v,i)=>({x:k[i],y:v}));
+  c1.update();
+
+  const c2 = charts.kf2;
+  c2.data.datasets[0].data = k.map(v=>({x:v,y:1}));
+  c2.data.datasets[1].data = ev.map((v,i)=>({x:k[i],y:v}));
+  c2.update();
+
+  const c3 = charts.kf3;
+  c3.data.datasets[0].data = err_m.map((v,i)=>({x:k[i],y:v}));
+  c3.data.datasets[1].data = err_kf.map((v,i)=>({x:k[i],y:v}));
+  c3.data.datasets[2].data = sig_p.map((v,i)=>({x:k[i],y:v}));
+  c3.data.datasets[3].data = k.map(v=>({x:v,y:rmse}));
+  c3.data.datasets[3].label = `RMSE=${rmse.toFixed(2)}`;
+  c3.update();
+}
+
+// ─── Orbit chart helper ───────────────────────────────────────────────────────
+function initOrbitCharts(prefix, color, label, data) {
+  const { tpx, tpy, mpx, mpy, ex, ey } = data;
+  const N = tpx.length;
+  const k = range(N);
+  charts[prefix+'1'] = new Chart(document.getElementById(prefix+'-c1').getContext('2d'), {
+    type:'line',
+    data:{ datasets:[
+      { label:'True orbit', data:tpx.map((v,i)=>({x:v,y:tpy[i]})), borderColor:'#33c85a', borderWidth:2.5, pointRadius:0, fill:false },
+      { label:'Raw meas.', data:mpx.map((v,i)=>({x:v,y:mpy[i]})), borderColor:'transparent', pointBackgroundColor:'#f25050', pointRadius:2.5, showLine:false },
+      { label:label+' estimate', data:ex.map((v,i)=>({x:v,y:ey[i]})), borderColor:color, borderWidth:2, pointRadius:0, fill:false },
+      { label:'Start', data:[{x:tpx[0],y:tpy[0]}], pointBackgroundColor:'#fff', pointRadius:7, showLine:false }
+    ]},
+    options:{...CHART_DEFAULTS,parsing:false,
+      scales:{
+        x:{...CHART_DEFAULTS.scales.x, title:{display:true,text:'X (m)',color:'#aaa'}},
+        y:{...CHART_DEFAULTS.scales.y, title:{display:true,text:'Y (m)',color:'#aaa'}}
+      },
+      plugins:{...CHART_DEFAULTS.plugins,title:{display:true,text:`2-D Orbit — ${label}`,color:'#ddd'}}}
+  });
+  const err_raw = tpx.map((v,i)=>Math.sqrt((mpx[i]-v)**2+(mpy[i]-tpy[i])**2));
+  const err_est = tpx.map((v,i)=>Math.sqrt((ex[i]-v)**2+(ey[i]-tpy[i])**2));
+  const rmse = Math.sqrt(err_est.reduce((a,v)=>a+v*v,0)/N);
+  charts[prefix+'2'] = new Chart(document.getElementById(prefix+'-c2').getContext('2d'), {
+    type:'line',
+    data:{ datasets:[
+      { label:'Raw error', data:err_raw.map((v,i)=>({x:k[i],y:v})), borderColor:'#f25050', borderWidth:1.5, pointRadius:0, fill:false },
+      { label:label+' error', data:err_est.map((v,i)=>({x:k[i],y:v})), borderColor:color, borderWidth:2, pointRadius:0, fill:false },
+      { label:`RMSE=${rmse.toFixed(3)} m`, data:k.map(v=>({x:v,y:rmse})), borderColor:color, borderWidth:1.5, borderDash:[4,3], pointRadius:0, fill:false }
+    ]},
+    options:{...CHART_DEFAULTS,parsing:false,plugins:{...CHART_DEFAULTS.plugins,title:{display:true,text:`${label} position error`,color:'#ddd'}}}
+  });
+}
+
+function updateOrbitCharts(prefix, color, label, data) {
+  const { tpx, tpy, mpx, mpy, ex, ey } = data;
+  const N = tpx.length;
+  const k = range(N);
+  const c1 = charts[prefix+'1'];
+  c1.data.datasets[0].data = tpx.map((v,i)=>({x:v,y:tpy[i]}));
+  c1.data.datasets[1].data = mpx.map((v,i)=>({x:v,y:mpy[i]}));
+  c1.data.datasets[2].data = ex.map((v,i)=>({x:v,y:ey[i]}));
+  c1.data.datasets[3].data = [{x:tpx[0],y:tpy[0]}];
+  c1.update();
+  const err_raw = tpx.map((v,i)=>Math.sqrt((mpx[i]-v)**2+(mpy[i]-tpy[i])**2));
+  const err_est = tpx.map((v,i)=>Math.sqrt((ex[i]-v)**2+(ey[i]-tpy[i])**2));
+  const rmse = Math.sqrt(err_est.reduce((a,v)=>a+v*v,0)/N);
+  const c2 = charts[prefix+'2'];
+  c2.data.datasets[0].data = err_raw.map((v,i)=>({x:k[i],y:v}));
+  c2.data.datasets[1].data = err_est.map((v,i)=>({x:k[i],y:v}));
+  c2.data.datasets[2].data = k.map(v=>({x:v,y:rmse}));
+  c2.data.datasets[2].label = `RMSE=${rmse.toFixed(3)} m`;
+  c2.update();
+}
+
+function initEKF() {
+  const d = runEKF(0.05,0.3,0.05,100);
+  initOrbitCharts('ekf','#5aa4ff','EKF',{tpx:d.tpx,tpy:d.tpy,mpx:d.mpx,mpy:d.mpy,ex:d.epx,ey:d.epy});
+}
+function updateEKF() {
+  const Q=+document.getElementById('ekf-Q').value, Rr=+document.getElementById('ekf-R').value;
+  const Rb=+document.getElementById('ekf-B').value, N=+document.getElementById('ekf-N').value;
+  document.getElementById('ekf-Q-val').textContent=`Q = ${Q.toFixed(4)}`;
+  document.getElementById('ekf-R-val').textContent=`σr = ${Rr.toFixed(3)}`;
+  document.getElementById('ekf-B-val').textContent=`σθ = ${Rb.toFixed(3)}`;
+  document.getElementById('ekf-N-val').textContent=`N = ${N}`;
+  const d=runEKF(Q,Rr,Rb,N);
+  updateOrbitCharts('ekf','#5aa4ff','EKF',{tpx:d.tpx,tpy:d.tpy,mpx:d.mpx,mpy:d.mpy,ex:d.epx,ey:d.epy});
+}
+
+function initUKF() {
+  const d=runUKF(0.05,0.3,0.05,100);
+  initOrbitCharts('ukf','#c066ff','UKF',{tpx:d.tpx,tpy:d.tpy,mpx:d.mpx,mpy:d.mpy,ex:d.upx,ey:d.upy});
+}
+function updateUKF() {
+  const Q=+document.getElementById('ukf-Q').value, Rr=+document.getElementById('ukf-R').value;
+  const Rb=+document.getElementById('ukf-B').value, N=+document.getElementById('ukf-N').value;
+  document.getElementById('ukf-Q-val').textContent=`Q = ${Q.toFixed(4)}`;
+  document.getElementById('ukf-R-val').textContent=`σr = ${Rr.toFixed(3)}`;
+  document.getElementById('ukf-B-val').textContent=`σθ = ${Rb.toFixed(3)}`;
+  document.getElementById('ukf-N-val').textContent=`N = ${N}`;
+  const d=runUKF(Q,Rr,Rb,N);
+  updateOrbitCharts('ukf','#c066ff','UKF',{tpx:d.tpx,tpy:d.tpy,mpx:d.mpx,mpy:d.mpy,ex:d.upx,ey:d.upy});
+}
+
+function initEnKF() {
+  const d=runEnKF(0.05,0.3,0.05,100,50);
+  initOrbitCharts('enkf','#33d6b0','EnKF',{tpx:d.tpx,tpy:d.tpy,mpx:d.mpx,mpy:d.mpy,ex:d.epx,ey:d.epy});
+}
+function updateEnKF() {
+  const Q=+document.getElementById('enkf-Q').value, Rr=+document.getElementById('enkf-R').value;
+  const Rb=+document.getElementById('enkf-B').value, Ne=+document.getElementById('enkf-Ne').value;
+  const N=+document.getElementById('enkf-N').value;
+  document.getElementById('enkf-Q-val').textContent=`Q = ${Q.toFixed(4)}`;
+  document.getElementById('enkf-R-val').textContent=`σr = ${Rr.toFixed(3)}`;
+  document.getElementById('enkf-B-val').textContent=`σθ = ${Rb.toFixed(3)}`;
+  document.getElementById('enkf-Ne-val').textContent=`Ne = ${Ne}`;
+  document.getElementById('enkf-N-val').textContent=`N = ${N}`;
+  const d=runEnKF(Q,Rr,Rb,N,Ne);
+  updateOrbitCharts('enkf','#33d6b0','EnKF',{tpx:d.tpx,tpy:d.tpy,mpx:d.mpx,mpy:d.mpy,ex:d.epx,ey:d.epy});
+}
+
+function initAKF() {
+  const { tp, meas, ep, ev, sig_p, Rhist } = runAKF(0.1,1,100,10);
+  const N=tp.length, k=range(N);
+  const upper=ep.map((v,i)=>v+sig_p[i]), lower=ep.map((v,i)=>v-sig_p[i]);
+  const col='#ff9933';
+  charts.akf1 = new Chart(document.getElementById('akf-c1').getContext('2d'), {
+    type:'line',
+    data:{ datasets:[
+      { label:'AKF ±1σ', data:upper.map((v,i)=>({x:k[i],y:v})), borderWidth:0, pointRadius:0, backgroundColor:'rgba(255,153,51,0.15)', fill:'+1' },
+      { label:'_lower', data:lower.map((v,i)=>({x:k[i],y:v})), borderWidth:0, pointRadius:0, backgroundColor:'rgba(255,153,51,0.15)', fill:false },
+      { label:'True', data:tp.map((v,i)=>({x:k[i],y:v})), borderColor:'#33c85a', borderWidth:2, pointRadius:0, fill:false },
+      { label:'Measured', data:meas.map((v,i)=>({x:k[i],y:v})), borderColor:'transparent', pointBackgroundColor:'#f25050', pointRadius:2.5, showLine:false },
+      { label:'AKF estimate', data:ep.map((v,i)=>({x:k[i],y:v})), borderColor:col, borderWidth:2, pointRadius:0, fill:false },
+      { label:'R jump', data:[{x:N/2,y:null}], borderColor:'#aaa', borderWidth:1.5, borderDash:[5,3], pointRadius:0 }
+    ]},
+    options:{...CHART_DEFAULTS,parsing:false,plugins:{...CHART_DEFAULTS.plugins,title:{display:true,text:'AKF Position tracking (R doubles at N/2)',color:'#ddd'}}}
+  });
+  const err_akf=ep.map((v,i)=>Math.abs(v-tp[i]));
+  const err_m=meas.map((v,i)=>Math.abs(v-tp[i]));
+  const rmse=Math.sqrt(err_akf.reduce((a,v)=>a+v*v,0)/N);
+  charts.akf2 = new Chart(document.getElementById('akf-c2').getContext('2d'), {
+    type:'line',
+    data:{ datasets:[
+      { label:'|meas-true|', data:err_m.map((v,i)=>({x:k[i],y:v})), borderColor:'#f25050', borderWidth:1.2, pointRadius:0, fill:false },
+      { label:'|AKF-true|', data:err_akf.map((v,i)=>({x:k[i],y:v})), borderColor:col, borderWidth:2, pointRadius:0, fill:false },
+      { label:`RMSE=${rmse.toFixed(2)}`, data:k.map(v=>({x:v,y:rmse})), borderColor:col, borderWidth:1.4, borderDash:[4,3], pointRadius:0, fill:false }
+    ]},
+    options:{...CHART_DEFAULTS,parsing:false,plugins:{...CHART_DEFAULTS.plugins,title:{display:true,text:'Position error',color:'#ddd'}}}
+  });
+  const R0=+document.getElementById('akf-R').value;
+  const Rtrue_vec=k.map(v=>R0*(1+3*(v>N/2?1:0)));
+  charts.akf3 = new Chart(document.getElementById('akf-c3').getContext('2d'), {
+    type:'line',
+    data:{ datasets:[
+      { label:'True R', data:Rtrue_vec.map((v,i)=>({x:k[i],y:v})), borderColor:'#33c85a', borderWidth:2, borderDash:[5,3], pointRadius:0, fill:false },
+      { label:'Estimated R', data:Rhist.map((v,i)=>({x:k[i],y:v})), borderColor:col, borderWidth:2, pointRadius:0, fill:false }
+    ]},
+    options:{...CHART_DEFAULTS,parsing:false,plugins:{...CHART_DEFAULTS.plugins,title:{display:true,text:'Adaptive R estimation',color:'#ddd'}}}
+  });
+}
+
+function updateAKF() {
+  const Q=+document.getElementById('akf-Q').value, R0=+document.getElementById('akf-R').value;
+  const W=+document.getElementById('akf-W').value, N=+document.getElementById('akf-N').value;
+  document.getElementById('akf-Q-val').textContent=`Q = ${Q.toFixed(3)}`;
+  document.getElementById('akf-R-val').textContent=`R₀ = ${R0.toFixed(3)}`;
+  document.getElementById('akf-W-val').textContent=`W = ${W}`;
+  document.getElementById('akf-N-val').textContent=`N = ${N}`;
+  const { tp, meas, ep, sig_p, Rhist } = runAKF(Q,R0,N,W);
+  const k=range(N), col='#ff9933';
+  const upper=ep.map((v,i)=>v+sig_p[i]), lower=ep.map((v,i)=>v-sig_p[i]);
+  const c1=charts.akf1;
+  c1.data.datasets[0].data=upper.map((v,i)=>({x:k[i],y:v}));
+  c1.data.datasets[1].data=lower.map((v,i)=>({x:k[i],y:v}));
+  c1.data.datasets[2].data=tp.map((v,i)=>({x:k[i],y:v}));
+  c1.data.datasets[3].data=meas.map((v,i)=>({x:k[i],y:v}));
+  c1.data.datasets[4].data=ep.map((v,i)=>({x:k[i],y:v}));
+  c1.update();
+  const err_akf=ep.map((v,i)=>Math.abs(v-tp[i]));
+  const err_m=meas.map((v,i)=>Math.abs(v-tp[i]));
+  const rmse=Math.sqrt(err_akf.reduce((a,v)=>a+v*v,0)/N);
+  const c2=charts.akf2;
+  c2.data.datasets[0].data=err_m.map((v,i)=>({x:k[i],y:v}));
+  c2.data.datasets[1].data=err_akf.map((v,i)=>({x:k[i],y:v}));
+  c2.data.datasets[2].data=k.map(v=>({x:v,y:rmse}));
+  c2.data.datasets[2].label=`RMSE=${rmse.toFixed(2)}`;
+  c2.update();
+  const Rtrue_vec=k.map(v=>R0*(1+3*(v>N/2?1:0)));
+  const c3=charts.akf3;
+  c3.data.datasets[0].data=Rtrue_vec.map((v,i)=>({x:k[i],y:v}));
+  c3.data.datasets[1].data=Rhist.map((v,i)=>({x:k[i],y:v}));
+  c3.update();
+}
+
+// ─── Tab switching ─────────────────────────────────────────────────────────────
+const lazyInit = { ekf: initEKF, ukf: initUKF, enkf: initEnKF, akf: initAKF };
+const initialized = { kf: true };
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    const id = btn.dataset.tab;
+    document.getElementById('tab-'+id).classList.add('active');
+    if (!initialized[id] && lazyInit[id]) { lazyInit[id](); initialized[id]=true; }
+    // Resize charts in newly visible tab
+    setTimeout(() => Object.values(charts).forEach(c => c.resize()), 50);
+  });
+});
+
+// ─── Slider wiring ─────────────────────────────────────────────────────────────
+function wire(ids, fn) {
+  ids.forEach(id => document.getElementById(id).addEventListener('input', fn));
+}
+wire(['kf-Q','kf-R','kf-N'], updateKF);
+wire(['ekf-Q','ekf-R','ekf-B','ekf-N'], updateEKF);
+wire(['ukf-Q','ukf-R','ukf-B','ukf-N'], updateUKF);
+wire(['enkf-Q','enkf-R','enkf-B','enkf-Ne','enkf-N'], updateEnKF);
+wire(['akf-Q','akf-R','akf-W','akf-N'], updateAKF);
+
+// ─── Boot ──────────────────────────────────────────────────────────────────────
+initKF();
+</script>
+</body>
+</html>
