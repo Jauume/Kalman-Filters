@@ -70,7 +70,7 @@ function updateKF() {
   document.getElementById('kf-Q-val').textContent = `Q = ${Q.toFixed(3)}`;
   document.getElementById('kf-R-val').textContent = `R = ${R.toFixed(3)}`;
   document.getElementById('kf-N-val').textContent = `N = ${N}`;
-  const { tp, meas, ep, ev, sig_p } = runKF(Q, R, N);
+  const { tp, meas, ep, ev, sig_p } = runKF(Q, R, N, seeds.kf);
   const k = range(N);
   const upper = ep.map((v,i) => v+sig_p[i]), lower = ep.map((v,i) => v-sig_p[i]);
   const err_kf = ep.map((v,i) => Math.abs(v-tp[i]));
@@ -163,7 +163,7 @@ function updateEKF() {
   document.getElementById('ekf-R-val').textContent=`σr = ${Rr.toFixed(3)}`;
   document.getElementById('ekf-B-val').textContent=`σθ = ${Rb.toFixed(3)}`;
   document.getElementById('ekf-N-val').textContent=`N = ${N}`;
-  const d = runEKF(Q,Rr,Rb,N);
+  const d = runEKF(Q,Rr,Rb,N,seeds.ekf);
   updateOrbitCharts('ekf','#5aa4ff','EKF',{tpx:d.tpx,tpy:d.tpy,mpx:d.mpx,mpy:d.mpy,ex:d.epx,ey:d.epy});
 }
 
@@ -178,7 +178,7 @@ function updateUKF() {
   document.getElementById('ukf-R-val').textContent=`σr = ${Rr.toFixed(3)}`;
   document.getElementById('ukf-B-val').textContent=`σθ = ${Rb.toFixed(3)}`;
   document.getElementById('ukf-N-val').textContent=`N = ${N}`;
-  const d = runUKF(Q,Rr,Rb,N);
+  const d = runUKF(Q,Rr,Rb,N,seeds.ukf);
   updateOrbitCharts('ukf','#c066ff','UKF',{tpx:d.tpx,tpy:d.tpy,mpx:d.mpx,mpy:d.mpy,ex:d.upx,ey:d.upy});
 }
 
@@ -195,7 +195,7 @@ function updateEnKF() {
   document.getElementById('enkf-B-val').textContent=`σθ = ${Rb.toFixed(3)}`;
   document.getElementById('enkf-Ne-val').textContent=`Ne = ${Ne}`;
   document.getElementById('enkf-N-val').textContent=`N = ${N}`;
-  const d = runEnKF(Q,Rr,Rb,N,Ne);
+  const d = runEnKF(Q,Rr,Rb,N,Ne,seeds.enkf);
   updateOrbitCharts('enkf','#33d6b0','EnKF',{tpx:d.tpx,tpy:d.tpy,mpx:d.mpx,mpy:d.mpy,ex:d.epx,ey:d.epy});
 }
 
@@ -252,7 +252,7 @@ function updateAKF() {
   document.getElementById('akf-R-val').textContent=`R₀ = ${R0.toFixed(3)}`;
   document.getElementById('akf-W-val').textContent=`W = ${W}`;
   document.getElementById('akf-N-val').textContent=`N = ${N}`;
-  const { tp, meas, ep, sig_p, Rhist } = runAKF(Q,R0,N,W);
+  const { tp, meas, ep, sig_p, Rhist } = runAKF(Q,R0,N,W,seeds.akf);
   const k=range(N), col='#ff9933';
   const upper=ep.map((v,i)=>v+sig_p[i]), lower=ep.map((v,i)=>v-sig_p[i]);
 

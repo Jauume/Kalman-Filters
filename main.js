@@ -1,3 +1,13 @@
+// ─── Seeds ─────────────────────────────────────────────────────────────────────
+const seeds = { kf: 42, ekf: 7, ukf: 7, enkf: 7, akf: 42 };
+function newSeed(tab) {
+  seeds[tab] = (Math.random() * 0xFFFFFFFF) >>> 0;
+  document.getElementById(tab+'-seed-label').textContent = 'seed: ' + seeds[tab];
+}
+function showSeed(tab) {
+  document.getElementById(tab+'-seed-label').textContent = 'seed: ' + seeds[tab];
+}
+
 // ─── Tab switching ─────────────────────────────────────────────────────────────
 const lazyInit = { ekf: initEKF, ukf: initUKF, enkf: initEnKF, akf: initAKF };
 const initialized = { kf: true };
@@ -24,5 +34,13 @@ wire(['ukf-Q','ukf-R','ukf-B','ukf-N'], updateUKF);
 wire(['enkf-Q','enkf-R','enkf-B','enkf-Ne','enkf-N'], updateEnKF);
 wire(['akf-Q','akf-R','akf-W','akf-N'], updateAKF);
 
+// ─── Run Again buttons ─────────────────────────────────────────────────────────
+document.getElementById('kf-run').addEventListener('click', () => { newSeed('kf'); updateKF(); });
+document.getElementById('ekf-run').addEventListener('click', () => { newSeed('ekf'); updateEKF(); });
+document.getElementById('ukf-run').addEventListener('click', () => { newSeed('ukf'); updateUKF(); });
+document.getElementById('enkf-run').addEventListener('click', () => { newSeed('enkf'); updateEnKF(); });
+document.getElementById('akf-run').addEventListener('click', () => { newSeed('akf'); updateAKF(); });
+
 // ─── Boot ──────────────────────────────────────────────────────────────────────
+showSeed('kf');
 initKF();

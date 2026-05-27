@@ -48,10 +48,18 @@
   .ukf-val   { color: #c066ff; }
   .enkf-val  { color: #33d6b0; }
   .akf-val   { color: #ff9933; }
+
+  .run-again {
+    padding: 7px 16px; border: none; border-radius: 6px; cursor: pointer;
+    background: #2e4a7a; color: #7eb8f7; font-size: 0.82rem; font-weight: 700;
+    transition: background 0.15s; white-space: nowrap; align-self: flex-end;
+  }
+  .run-again:hover { background: #3a5fa0; }
+  .seed-label { font-size: 0.75rem; color: #666; margin-top: 2px; }
 </style>
 </head>
 <body>
-<h1>Kalman Filter Demo</h1>
+<h1>Kalman Filter Toy</h1>
 <p style="text-align:center; margin-bottom:8px;"><a href="https://github.com/Jauume/Kalman-Filters" style="color:#7eb8f7; font-size:0.85rem;">GitHub</a></p>
 
 <div class="tabs">
@@ -79,6 +87,10 @@
       <label>Steps N</label>
       <input type="range" id="kf-N" min="20" max="200" step="1" value="80">
       <span class="val kf-val" id="kf-N-val">N = 80</span>
+    </div>
+    <div class="param-group" style="justify-content:flex-end;">
+      <button class="run-again" id="kf-run">▶ Run Again</button>
+      <span class="seed-label" id="kf-seed-label">seed: —</span>
     </div>
   </div>
   <div style="margin-bottom:10px;">
@@ -113,6 +125,10 @@
       <input type="range" id="ekf-N" min="30" max="200" step="1" value="100">
       <span class="val ekf-val" id="ekf-N-val">N = 100</span>
     </div>
+    <div class="param-group" style="justify-content:flex-end;">
+      <button class="run-again" id="ekf-run">▶ Run Again</button>
+      <span class="seed-label" id="ekf-seed-label">seed: —</span>
+    </div>
   </div>
   <div class="charts-2col">
     <div class="chart-box tall"><canvas id="ekf-c1"></canvas></div>
@@ -142,6 +158,10 @@
       <label>Steps N</label>
       <input type="range" id="ukf-N" min="30" max="200" step="1" value="100">
       <span class="val ukf-val" id="ukf-N-val">N = 100</span>
+    </div>
+    <div class="param-group" style="justify-content:flex-end;">
+      <button class="run-again" id="ukf-run">▶ Run Again</button>
+      <span class="seed-label" id="ukf-seed-label">seed: —</span>
     </div>
   </div>
   <div class="charts-2col">
@@ -178,6 +198,10 @@
       <input type="range" id="enkf-N" min="30" max="200" step="1" value="100">
       <span class="val enkf-val" id="enkf-N-val">N = 100</span>
     </div>
+    <div class="param-group" style="justify-content:flex-end;">
+      <button class="run-again" id="enkf-run">▶ Run Again</button>
+      <span class="seed-label" id="enkf-seed-label">seed: —</span>
+    </div>
   </div>
   <div class="charts-2col">
     <div class="chart-box tall"><canvas id="enkf-c1"></canvas></div>
@@ -207,6 +231,10 @@
       <label>Steps N</label>
       <input type="range" id="akf-N" min="40" max="200" step="1" value="100">
       <span class="val akf-val" id="akf-N-val">N = 100</span>
+    </div>
+    <div class="param-group" style="justify-content:flex-end;">
+      <button class="run-again" id="akf-run">▶ Run Again</button>
+      <span class="seed-label" id="akf-seed-label">seed: —</span>
     </div>
   </div>
   <div style="margin-bottom:10px;">

@@ -4,8 +4,8 @@
 // ─── KF: 1-D constant-velocity tracker ──────────────────────────────────────
 // State: [position, velocity]
 // F = [[1,dt],[0,1]],  H = [1,0]
-function runKF(Qn, Rn, steps) {
-  const rng = makeRng(42);
+function runKF(Qn, Rn, steps, seed=42) {
+  const rng = makeRng(seed);
   const dt = 1;
   const F = mat(2,2,[1,dt,0,1]);
   const H = mat(1,2,[1,0]);
@@ -60,8 +60,8 @@ function runOrbit(steps, rng, Rr, Rb) {
 // ─── EKF: 2-D orbit with nonlinear polar measurement ────────────────────────
 // State: [x, y, vx, vy], measurement h(x) = [range, bearing]
 // Linearises h via Jacobian Hj at each step
-function runEKF(Qn, Rr, Rb, steps) {
-  const rng = makeRng(7);
+function runEKF(Qn, Rr, Rb, steps, seed=7) {
+  const rng = makeRng(seed);
   const { tpx, tpy, rm, bm, mpx, mpy } = runOrbit(steps, rng, Rr, Rb);
   const dt = 0.1;
   const F = mat(4,4,[1,0,dt,0, 0,1,0,dt, 0,0,1,0, 0,0,0,1]);
@@ -94,8 +94,8 @@ function runEKF(Qn, Rr, Rb, steps) {
 // ─── UKF: same orbit, no Jacobian — uses sigma points instead ───────────────
 // Deterministically chosen 2n+1 sigma points capture mean and covariance;
 // propagated through the nonlinear h, then recombined with weights Wm/Wc
-function runUKF(Qn, Rr, Rb, steps) {
-  const rng = makeRng(7);
+function runUKF(Qn, Rr, Rb, steps, seed=7) {
+  const rng = makeRng(seed);
   const { tpx, tpy, rm, bm, mpx, mpy } = runOrbit(steps, rng, Rr, Rb);
   const dt = 0.1;
   const F = mat(4,4,[1,0,dt,0, 0,1,0,dt, 0,0,1,0, 0,0,0,1]);
@@ -167,8 +167,8 @@ function runUKF(Qn, Rr, Rb, steps) {
 
 // ─── EnKF: same orbit, Monte-Carlo ensemble of Ne members ───────────────────
 // No explicit P matrix — covariance is implicit in the spread of the ensemble
-function runEnKF(Qn, Rr, Rb, steps, Ne) {
-  const rng = makeRng(7);
+function runEnKF(Qn, Rr, Rb, steps, Ne, seed=7) {
+  const rng = makeRng(seed);
   const { tpx, tpy, rm, bm, mpx, mpy } = runOrbit(steps, rng, Rr, Rb);
   const dt = 0.1;
   const F = mat(4,4,[1,0,dt,0, 0,1,0,dt, 0,0,1,0, 0,0,0,1]);
@@ -241,8 +241,8 @@ function runEnKF(Qn, Rr, Rb, steps, Ne) {
 // ─── AKF: 1-D tracker that estimates R online from a sliding window ──────────
 // Same as KF but R is adapted each step using the innovation variance:
 //   R_hat = mean(ν²) - H*P*H'
-function runAKF(Qn, R0, steps, W) {
-  const rng = makeRng(42);
+function runAKF(Qn, R0, steps, W, seed=42) {
+  const rng = makeRng(seed);
   const dt = 1;
   const F = mat(2,2,[1,dt,0,1]);
   const H = mat(1,2,[1,0]);

@@ -1,6 +1,6 @@
-# Kalman Filter Demo
+# Kalman Filter Toy
 
-An interactive browser demo of five Kalman filter variants. Open `index.html` directly in any browser — no server needed.
+An interactive browser toy of Kalman filter variants. Open `index.html` directly in any browser or [click here](https://jauume.github.io/Kalman-Filters/).
 
 ---
 
@@ -124,15 +124,3 @@ R̂ = mean(ν²) − H · P · Hᵀ
 ```
 
 This lets the filter automatically react when sensor noise changes mid-run. In the demo, R doubles halfway through the simulation; watch the estimated R (orange) track the true R (green).
-
----
-
-## File structure
-
-```
-index.html   — UI: tabs, sliders, canvas elements
-math.js      — matrix helpers (mat, mmul, inv2, chol, …) and RNG
-filters.js   — runKF, runEKF, runUKF, runEnKF, runAKF
-charts.js    — Chart.js wrappers: initXXX / updateXXX functions
-main.js      — tab switching, slider wiring, boot (initKF)
-```
