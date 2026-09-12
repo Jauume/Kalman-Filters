@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kalman Filter Demo</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #1a1a2e; color: #e0e0e0; min-height: 100vh; }
+  h1 { text-align: center; padding: 16px 0 8px; font-size: 1.4rem; color: #7eb8f7; letter-spacing: 1px; }
+
+  /* Tabs */
+  .tabs { display: flex; justify-content: center; gap: 4px; padding: 0 12px 0; flex-wrap: wrap; }
+  .tab-btn {
+    padding: 8px 20px; border: none; cursor: pointer; border-radius: 6px 6px 0 0;
+    font-size: 0.9rem; font-weight: 600; transition: background 0.2s;
+    background: #2a2a4a; color: #aaa;
+  }
+  .tab-btn.active { color: #fff; }
+  .tab-btn[data-tab="kf"].active    { background: #3a5fa0; }
+  .tab-btn[data-tab="ekf"].active   { background: #3a5fa0; }
+  .tab-btn[data-tab="ukf"].active   { background: #6a3a9a; }
+  .tab-btn[data-tab="enkf"].active  { background: #1a7a6a; }
+  .tab-btn[data-tab="akf"].active   { background: #9a5010; }
+
+  .tab-content { display: none; padding: 0 12px 12px; }
+  .tab-content.active { display: block; }
+
+  /* Parameter panel */
+  .params {
+    background: #22223a; border-radius: 8px; padding: 12px 16px;
+    margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center;
+  }
+  .param-group { display: flex; flex-direction: column; gap: 4px; min-width: 160px; flex: 1; }
+  .param-group label { font-size: 0.78rem; font-weight: 600; color: #aaa; }
+  .param-group input[type=range] { width: 100%; accent-color: #7eb8f7; cursor: pointer; }
+  .param-group .val { font-size: 0.82rem; font-weight: 700; }
+
+  /* Charts grid */
+  .charts-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .chart-box { background: #1e1e32; border-radius: 8px; padding: 8px; position: relative; height: 260px; }
+  .chart-box.tall { height: 340px; }
+
+  /* Color accents per tab */
+  .kf-val    { color: #5aa4ff; }
+  .ekf-val   { color: #5aa4ff; }
+  .ukf-val   { color: #c066ff; }
+  .enkf-val  { color: #33d6b0; }
+  .akf-val   { color: #ff9933; }
+
+  .run-again {
+    padding: 7px 16px; border: none; border-radius: 6px; cursor: pointer;
+    background: #2e4a7a; color: #7eb8f7; font-size: 0.82rem; font-weight: 700;
+    transition: background 0.15s; white-space: nowrap; align-self: flex-end;
+  }
+  .run-again:hover { background: #3a5fa0; }
+  .seed-label { font-size: 0.75rem; color: #666; margin-top: 2px; }
+</style>
+</head>
+<body>
+<h1>Kalman Filter Toy</h1>
+<p style="text-align:center; margin-bottom:8px;"><a href="https://github.com/Jauume/Kalman-Filters" style="color:#7eb8f7; font-size:0.85rem;">GitHub</a></p>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="kf">KF</button>
+  <button class="tab-btn" data-tab="ekf">EKF</button>
+  <button class="tab-btn" data-tab="ukf">UKF</button>
+  <button class="tab-btn" data-tab="enkf">EnKF</button>
+  <button class="tab-btn" data-tab="akf">AKF</button>
+</div>
+
+<!-- ===== KF ===== -->
+<div class="tab-content active" id="tab-kf">
+  <div class="params">
+    <div class="param-group">
+      <label>Process noise Q</label>
+      <input type="range" id="kf-Q" min="0.01" max="5" step="0.01" value="0.1">
+      <span class="val kf-val" id="kf-Q-val">Q = 0.100</span>
+    </div>
+    <div class="param-group">
+      <label>Sensor noise R</label>
+      <input type="range" id="kf-R" min="0.1" max="10" step="0.1" value="2">
+      <span class="val kf-val" id="kf-R-val">R = 2.000</span>
+    </div>
+    <div class="param-group">
+      <label>Steps N</label>
+      <input type="range" id="kf-N" min="20" max="200" step="1" value="80">
+      <span class="val kf-val" id="kf-N-val">N = 80</span>
+    </div>
+    <div class="param-group" style="justify-content:flex-end;">
+      <button class="run-again" id="kf-run">▶ Run Again</button>
+      <span class="seed-label" id="kf-seed-label">seed: —</span>
+    </div>
+  </div>
+  <div style="margin-bottom:10px;">
+    <div class="chart-box tall"><canvas id="kf-c1"></canvas></div>
+  </div>
+  <div class="charts-2col">
+    <div class="chart-box"><canvas id="kf-c2"></canvas></div>
+    <div class="chart-box"><canvas id="kf-c3"></canvas></div>
+  </div>
+</div>
+
+<!-- ===== EKF ===== -->
+<div class="tab-content" id="tab-ekf">
+  <div class="params">
+    <div class="param-group">
+      <label>Process noise Q</label>
+      <input type="range" id="ekf-Q" min="0.001" max="0.5" step="0.001" value="0.05">
+      <span class="val ekf-val" id="ekf-Q-val">Q = 0.0500</span>
+    </div>
+    <div class="param-group">
+      <label>Range noise σr</label>
+      <input type="range" id="ekf-R" min="0.05" max="2" step="0.01" value="0.3">
+      <span class="val ekf-val" id="ekf-R-val">σr = 0.300</span>
+    </div>
+    <div class="param-group">
+      <label>Bearing noise σθ</label>
+      <input type="range" id="ekf-B" min="0.01" max="0.3" step="0.001" value="0.05">
+      <span class="val ekf-val" id="ekf-B-val">σθ = 0.050</span>
+    </div>
+    <div class="param-group">
+      <label>Steps N</label>
+      <input type="range" id="ekf-N" min="30" max="200" step="1" value="100">
+      <span class="val ekf-val" id="ekf-N-val">N = 100</span>
+    </div>
+    <div class="param-group" style="justify-content:flex-end;">
+      <button class="run-again" id="ekf-run">▶ Run Again</button>
+      <span class="seed-label" id="ekf-seed-label">seed: —</span>
+    </div>
+  </div>
+  <div class="charts-2col">
+    <div class="chart-box tall"><canvas id="ekf-c1"></canvas></div>
+    <div class="chart-box tall"><canvas id="ekf-c2"></canvas></div>
+  </div>
+</div>
+
+<!-- ===== UKF ===== -->
+<div class="tab-content" id="tab-ukf">
+  <div class="params">
+    <div class="param-group">
+      <label>Process noise Q</label>
+      <input type="range" id="ukf-Q" min="0.001" max="0.5" step="0.001" value="0.05">
+      <span class="val ukf-val" id="ukf-Q-val">Q = 0.0500</span>
+    </div>
+    <div class="param-group">
+      <label>Range noise σr</label>
+      <input type="range" id="ukf-R" min="0.05" max="2" step="0.01" value="0.3">
+      <span class="val ukf-val" id="ukf-R-val">σr = 0.300</span>
+    </div>
+    <div class="param-group">
+      <label>Bearing noise σθ</label>
+      <input type="range" id="ukf-B" min="0.01" max="0.3" step="0.001" value="0.05">
+      <span class="val ukf-val" id="ukf-B-val">σθ = 0.050</span>
+    </div>
+    <div class="param-group">
+      <label>Steps N</label>
+      <input type="range" id="ukf-N" min="30" max="200" step="1" value="100">
+      <span class="val ukf-val" id="ukf-N-val">N = 100</span>
+    </div>
+    <div class="param-group" style="justify-content:flex-end;">
+      <button class="run-again" id="ukf-run">▶ Run Again</button>
+      <span class="seed-label" id="ukf-seed-label">seed: —</span>
+    </div>
+  </div>
+  <div class="charts-2col">
+    <div class="chart-box tall"><canvas id="ukf-c1"></canvas></div>
+    <div class="chart-box tall"><canvas id="ukf-c2"></canvas></div>
+  </div>
+</div>
+
+<!-- ===== EnKF ===== -->
+<div class="tab-content" id="tab-enkf">
+  <div class="params">
+    <div class="param-group">
+      <label>Process noise Q</label>
+      <input type="range" id="enkf-Q" min="0.001" max="0.5" step="0.001" value="0.05">
+      <span class="val enkf-val" id="enkf-Q-val">Q = 0.0500</span>
+    </div>
+    <div class="param-group">
+      <label>Range noise σr</label>
+      <input type="range" id="enkf-R" min="0.05" max="2" step="0.01" value="0.3">
+      <span class="val enkf-val" id="enkf-R-val">σr = 0.300</span>
+    </div>
+    <div class="param-group">
+      <label>Bearing noise σθ</label>
+      <input type="range" id="enkf-B" min="0.01" max="0.3" step="0.001" value="0.05">
+      <span class="val enkf-val" id="enkf-B-val">σθ = 0.050</span>
+    </div>
+    <div class="param-group">
+      <label>Ensemble size Ne</label>
+      <input type="range" id="enkf-Ne" min="10" max="200" step="1" value="50">
+      <span class="val enkf-val" id="enkf-Ne-val">Ne = 50</span>
+    </div>
+    <div class="param-group">
+      <label>Steps N</label>
+      <input type="range" id="enkf-N" min="30" max="200" step="1" value="100">
+      <span class="val enkf-val" id="enkf-N-val">N = 100</span>
+    </div>
+    <div class="param-group" style="justify-content:flex-end;">
+      <button class="run-again" id="enkf-run">▶ Run Again</button>
+      <span class="seed-label" id="enkf-seed-label">seed: —</span>
+    </div>
+  </div>
+  <div class="charts-2col">
+    <div class="chart-box tall"><canvas id="enkf-c1"></canvas></div>
+    <div class="chart-box tall"><canvas id="enkf-c2"></canvas></div>
+  </div>
+</div>
+
+<!-- ===== AKF ===== -->
+<div class="tab-content" id="tab-akf">
+  <div class="params">
+    <div class="param-group">
+      <label>Process noise Q</label>
+      <input type="range" id="akf-Q" min="0.01" max="5" step="0.01" value="0.1">
+      <span class="val akf-val" id="akf-Q-val">Q = 0.100</span>
+    </div>
+    <div class="param-group">
+      <label>Initial R₀</label>
+      <input type="range" id="akf-R" min="0.1" max="10" step="0.1" value="1">
+      <span class="val akf-val" id="akf-R-val">R₀ = 1.000</span>
+    </div>
+    <div class="param-group">
+      <label>Window W</label>
+      <input type="range" id="akf-W" min="3" max="40" step="1" value="10">
+      <span class="val akf-val" id="akf-W-val">W = 10</span>
+    </div>
+    <div class="param-group">
+      <label>Steps N</label>
+      <input type="range" id="akf-N" min="40" max="200" step="1" value="100">
+      <span class="val akf-val" id="akf-N-val">N = 100</span>
+    </div>
+    <div class="param-group" style="justify-content:flex-end;">
+      <button class="run-again" id="akf-run">▶ Run Again</button>
+      <span class="seed-label" id="akf-seed-label">seed: —</span>
+    </div>
+  </div>
+  <div style="margin-bottom:10px;">
+    <div class="chart-box tall"><canvas id="akf-c1"></canvas></div>
+  </div>
+  <div class="charts-2col">
+    <div class="chart-box"><canvas id="akf-c2"></canvas></div>
+    <div class="chart-box"><canvas id="akf-c3"></canvas></div>
+  </div>
+</div>
+
+<script src="math.js"></script>
+<script src="filters.js"></script>
+<script src="charts.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
